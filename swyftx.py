@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
+import argparse
 import requests
+import sys
 
 DEMO = 0
 
@@ -67,6 +69,15 @@ class Swyftx():
             if i['code'] == 'USDT':
                 self.ratio_aud_usd = self.get_ratio('AUD', 'USDT')
 
+    def exists_currency(self, code):
+        ''' Checks that currency exists in list of traded assets. AUD also returns True to support CLI validation. '''
+        if code == 'AUD':
+            return True
+        for i in self.assets_traded:
+            if i['code'] == code:
+                return True
+        return False
+        
     def get_ratio(self, c1, c2):
         ''' Returns the ratio between two provided currencies '''
         if c1 == 'AUD':
@@ -209,7 +220,7 @@ class Swyftx():
         ''' Displays all closed and pending transactions in order (most recent last). '''
         completed = []
         pending   = []
-        
+
         # FIXME: Transactions seem to be all related to USD. This routine won't work properly if this isn't the case.
         ratio = self.get_ratio(currency, 'USDT')
         if not ratio:
@@ -260,19 +271,34 @@ class Swyftx():
 
     
 if __name__ == "__main__":
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-b', '--balance', help='displays current balance', action='store_true')
+    parser.add_argument('-t', '--transactions', help='displays completed and pending transactions', action='store_true')
+    parser.add_argument('-c', '--currency', type = str, help="sets the currency (USDT default)")
+    args = parser.parse_args()
+    currency = args.currency           
+    
     if not get_status():
+        print(f'Can\'t connect to endpoint. Please check connection.')
         exit(2)
     
     s = Swyftx()
+            
+    # The currency default needs to be set here as well as the CLI can be set to None
+    if not s.exists_currency(currency):
+        print(f'Unknown currency selected')
+        exit(2)
+
     if not s.status:
         print(f'Could not establish connection to Swyftx API')
         exit(2)
     else:
         print(f'Connection to Swyftx API established')
-        
-        s.show_balances('USDT')
-        s.show_transactions('USDT')   
+                
+        if args.balance:
+            s.show_balances(currency)
+        if args.transactions:
+            s.show_transactions(currency)
         
         if s.logout():
             print(f'\nSuccessfully logged out')
