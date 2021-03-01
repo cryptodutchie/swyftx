@@ -4,15 +4,7 @@ import argparse
 import requests
 import sys
 
-DEMO = 0
-
 FEE = 0.006
-
-if not DEMO:
-    URL =      'https://api.swyftx.com.au/'
-else:
-    URL =      'https://api.demo.swyftx.com.au/'
-
 
 def get_key():
     ''' The script requires your API key to be stored in a local file named api_key.dat '''
@@ -114,7 +106,6 @@ class Swyftx():
         ''' Refreshes access token based on API key. '''
         r = requests.post(URL+'auth/refresh/', data={'apiKey': get_key()})
         r = r.json()
-
         if 'accessToken' in r.keys():
             result = r['accessToken']
         else:
@@ -147,7 +138,7 @@ class Swyftx():
     def get_balances(self):
         ''' Obtains balances of owned assets through list of dictionaries with following keys
                 'assetId', 'availableBalance' '''
-        return self.do_request_get(URL+'user/balance/', self.token)
+        return self.do_request_get(URL_AUTH+'user/balance/', self.token)
 
     def get_transactions(self):
         ''' Obtains all transactions through list of dictionaries with the following keys:
@@ -160,7 +151,7 @@ class Swyftx():
                 'updated': (int) ??,
                 'actionType': (string) type of transaction,
                 'status': (string) result of transaction '''
-        return self.do_request_get(URL+'history/all/', self.token)  #type/assetId/?limit=&page=&sortBy=
+        return self.do_request_get(URL_AUTH+'history/all/', self.token)  #type/assetId/?limit=&page=&sortBy=
 
     def show_balances(self, currency='USDT'):
         ''' Creates overview of current balances > 0 and calculates total value. Overview is printed to console. '''
@@ -272,11 +263,18 @@ class Swyftx():
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--demo', help='uses demo mode', action='store_true')
     parser.add_argument('-b', '--balance', help='displays current balance', action='store_true')
     parser.add_argument('-t', '--transactions', help='displays completed and pending transactions', action='store_true')
     parser.add_argument('-c', '--currency', type = str, help="sets the currency (USDT default)")
     args = parser.parse_args()
     currency = args.currency           
+    
+    URL = 'https://api.swyftx.com.au/'
+    if not args.demo:
+        URL_AUTH = 'https://api.swyftx.com.au/'
+    else:
+        URL_AUTH = 'https://api.demo.swyftx.com.au/'
     
     if not get_status():
         print(f'Can\'t connect to endpoint. Please check connection.')
@@ -285,6 +283,8 @@ if __name__ == "__main__":
     s = Swyftx()
             
     # The currency default needs to be set here as well as the CLI can be set to None
+    if not currency:
+        currency = 'USDT'
     if not s.exists_currency(currency):
         print(f'Unknown currency selected')
         exit(2)
