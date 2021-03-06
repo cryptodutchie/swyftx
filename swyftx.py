@@ -153,9 +153,9 @@ class Swyftx():
                 'status': (string) result of transaction '''
         return self.do_request_get(URL_AUTH+'history/all/', self.token)  #type/assetId/?limit=&page=&sortBy=
 
-    def show_balances(self, currency='USDT'):
+    def parse_balances(self, currency='USDT'):
         ''' Creates overview of current balances > 0 and calculates total value. Overview is printed to console. '''
-        total_val = 0
+        balances = []
         currency_ratio_id     = 1
         currency_ratio_sell   = 1
         
@@ -166,9 +166,6 @@ class Swyftx():
                 currency_ratio_sell   = float(i['sell'])
                 currency_id           = i['id']
         
-        temp = 'Value ('+currency+')'
-        print(f'\nCode   (Name)                    |         Balance  | {temp:>14}  |           Sold  |  Total gain')
-        print('---------------------------------+------------------+-----------------+-----------------+-------------')
         for i in self.balances:
             id       = i['assetId']
             bal      = float(i['availableBalance'])
@@ -201,13 +198,13 @@ class Swyftx():
                                 break
 
             if complete:
-                total_val += val
                 gain = 100 * (val + sold) / bought
-                print(f'{code:6s} {name:26s}|   {bal:>13.4f}  |  {val:>13.4f}  |  {sold:>13.4f}  |    {gain:>7.2f}%')
+                balances.append({'code': code, 'name': name, 'bal': bal, 'val': val, 'sold': sold, 'gain': gain})
+                
+        return balances
 
-        print(f'\nTotal portfolio value:                              {total_val:>14.2f}')
 
-    def show_transactions(self, currency='USDT'):
+    def parse_transactions(self, currency='USDT'):
         ''' Displays all closed and pending transactions in order (most recent last). '''
         completed = []
         pending   = []
@@ -218,8 +215,8 @@ class Swyftx():
             print('Invalid currency provided')
             return        
 
-        for t in reversed(s.transactions):
-            if t['actionType'] not in ('Deposit', 'Withdrawal') and t['status'] != 'Failed':
+        for t in reversed(self.transactions):
+            if t['actionType'] not in ('Deposit', 'Withdrawal', 'Dust Sell') and t['status'] != 'Failed':
                 
                 for j in self.assets_traded:
                     if j['id'] == int(t['asset']):
@@ -244,21 +241,74 @@ class Swyftx():
                 trigger      = t['trigger'] / ratio
                 
                 if t['status'] == 'Complete':
-                    completed.append(f"{code:>6s} | {t['actionType']:>15s} | {amount:>13.4f} | {trans_value:>13.4f} | {fee:>13.4f} | {rec_value:>13.4f}")
-                else:
-                    pending.append(f"{code:>6s} | {t['actionType']:>15s} | {amount:>13.4f} | {1/trigger:>13.4f} |  {rec_value:>13.4f}")
+                    completed.append({'code': code, 'type': t['actionType'], 'amount': amount, 'trans_value': trans_value, 'fee': fee, 'rec_value': rec_value})
 
+                else:
+                    pending.append({'code': code, 'type': t['actionType'], 'amount': amount, 'trigger': (1/trigger), 'rec_value': rec_value})
+        
+        return completed, pending
+
+
+class Data():
+    def __init__(self):
+        self.balances               = []
+        self.transactions_pending   = []
+        self.transactions_completed = []
+    
+    def add_balances(self, balances):
+        existing_codes = {}
+        for i in range(len(self.balances)):
+            j = self.balances[i]
+            existing_codes[j['code']] =  i
+        for i in balances:
+            if i['code'] not in existing_codes.keys():
+                self.balances.append(i)
+            else:
+                j = existing_codes[i['code']]
+                self.balances[j]['bal']  += i['bal']
+                self.balances[j]['val']  += i['val']
+                self.balances[j]['sold'] += i['sold']
+                self.balances[j]['gain'] += i['gain']
+    
+    def add_transactions_pending(self, transactions):
+        self.transactions_pending += transactions
+    
+    def add_transactions_completed(self, transactions):
+        self.transactions_completed += transactions
+    
+
+class Output():
+    def __init__(self, data):
+        self.data = data
+        
+    def print_balances(self, currency):
+        total_val = 0
+        temp = 'Value ('+currency+')'
+        print(f'\nCode   (Name)                    |         Balance  | {temp:>14}  |           Sold  |  Total gain')
+        print('---------------------------------+------------------+-----------------+-----------------+-------------')
+        for i in self.data.balances:       
+            print(f"{i['code']:6s} {i['name']:26s}|   {i['bal']:>13.4f}  |  {i['val']:>13.4f}  |  {i['sold']:>13.4f}  |    {i['gain']:>7.2f}%")
+            total_val += i['val']
+
+        print(f'\nTotal portfolio value:                              {total_val:>14.2f}')
+
+    def print_transactions(self, currency):
+        ''' Displays all closed and pending transactions in order (most recent last). '''
         print(f'\nTransaction history (in {currency}):\n')
         print(f'  Code |     Action Type |        Amount |   Trans Value |           Fee |  Actual Value')
         print(f'-------+-----------------+---------------+---------------+---------------+---------------')
-        for i in completed:
-            print(i)
+        for i in self.data.transactions_completed:
+            print(f"{i['code']:>6s} | {i['type']:>15s} | {i['amount']:>13.4f} | {i['trans_value']:>13.4f} | {i['fee']:>13.4f} | {i['rec_value']:>13.4f}")
             
         print(f'\nTransactions pending (in {currency}):\n')
         print(f'  Code |     Action Type |        Amount |       Trigger |   Actual Value')
         print(f'-------+-----------------+---------------+---------------+----------------')
-        for i in pending:
-            print(i)
+        for i in self.data.transactions_pending:
+            print(f"{i['code']:>6s} | {i['type']:>15s} | {i['amount']:>13.4f} | {i['trigger']:>13.4f} | {i['rec_value']:>13.4f}")
+
+    def export_transactions(self):
+        ''' Placeeholder function for export function '''
+        pass
 
     
 if __name__ == "__main__":
@@ -281,6 +331,8 @@ if __name__ == "__main__":
         exit(2)
     
     s = Swyftx()
+    d = Data()
+    o = Output(d)
             
     # The currency default needs to be set here as well as the CLI can be set to None
     if not currency:
@@ -296,10 +348,14 @@ if __name__ == "__main__":
         print(f'Connection to Swyftx API established')
                 
         if args.balance:
-            s.show_balances(currency)
+            b = s.parse_balances(currency)
+            d.add_balances(b)
+            o.print_balances(currency)       
         if args.transactions:
-            s.show_transactions(currency)
-        
+            c, p = s.parse_transactions(currency)
+            d.add_transactions_pending(p)
+            d.add_transactions_completed(c)
+            o.print_transactions(currency)       
         if s.logout():
             print(f'\nSuccessfully logged out')
         else:
