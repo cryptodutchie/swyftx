@@ -177,8 +177,8 @@ class Swyftx():
                 for j in self.assets_listed:
                     if j['id'] == id:
                         code = j['code']
-                        name = '('+j['name']+')'
-                
+                        name = j['name']
+                        
                         for k in self.assets_traded:
                             if k['id'] == id:
                             
@@ -287,7 +287,8 @@ class Output():
         print(f'\nCode   (Name)                    |         Balance  | {temp:>14}  |           Sold  |  Total gain')
         print('---------------------------------+------------------+-----------------+-----------------+-------------')
         for i in self.data.balances:       
-            print(f"{i['code']:6s} {i['name']:26s}|   {i['bal']:>13.4f}  |  {i['val']:>13.4f}  |  {i['sold']:>13.4f}  |    {i['gain']:>7.2f}%")
+            name = '('+(i['name'])[:22]+')'
+            print(f"{i['code']:6s} {name:26s}|   {i['bal']:>13.4f}  |  {i['val']:>13.4f}  |  {i['sold']:>13.4f}  |    {i['gain']:>7.2f}%")
             total_val += i['val']
 
         print(f'\nTotal portfolio value:                              {total_val:>14.2f}')
