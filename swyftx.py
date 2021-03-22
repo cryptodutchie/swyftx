@@ -193,6 +193,8 @@ class Swyftx():
                                             bought += (1 + FEE) * l['amount'] * l['trigger'] * self.ratio_aud_usd / currency_ratio_sell
                                         if l['actionType'] in ('Market Sell', 'Limit Sell', 'Stop Limit Sell') and l['status'] == 'Complete':
                                             sold   += (1 - FEE) * l['amount'] / l['trigger'] * self.ratio_aud_usd / currency_ratio_sell
+                                        if l['actionType'] in ('Withdrawal') and l['status'] == 'Complete':
+                                            sold   += l['amount'] * sell / currency_ratio_sell
                                 
                                 complete = True
                                 break
@@ -284,7 +286,7 @@ class Output():
     def print_balances(self, currency):
         total_val = 0
         temp = 'Value ('+currency+')'
-        print(f'\nCode   (Name)                    |         Balance  | {temp:>14}  |           Sold  |  Total gain')
+        print(f'\nCode   (Name)                    |         Balance  | {temp:>14}  |   Sold/Whdrawn  |  Total gain')
         print('---------------------------------+------------------+-----------------+-----------------+-------------')
         for i in self.data.balances:       
             name = '('+(i['name'])[:22]+')'
